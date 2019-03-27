@@ -1,0 +1,1 @@
+python monodepth_main.py --mode train --data_path data/ --output_directory out/ --filenames_file utils/filenames/stereo360_train.txt --checkpoint_path log/stereo360/model-80000 --do_stereo --dataset stereo360 --model_name stereo360 --wrap_mode circular --learning_rate 1e-6 --input_width 1024 --input_height 512 --batch_size 2 --log_directory log --num_epochs 64

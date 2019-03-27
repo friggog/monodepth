@@ -1,10 +1,10 @@
-# Copyright UCL Business plc 2017. Patent Pending. All rights reserved. 
+# Copyright UCL Business plc 2017. Patent Pending. All rights reserved.
 #
 # The MonoDepth Software is licensed under the terms of the UCLB ACP-A licence
 # which allows for non-commercial use only, the full terms of which are made
 # available in the LICENSE file.
 #
-# For any other use of the software not covered by the UCLB ACP-A Licence, 
+# For any other use of the software not covered by the UCLB ACP-A Licence,
 # please contact info@uclb.com
 
 """Monodepth data loader.
@@ -12,6 +12,7 @@
 
 from __future__ import absolute_import, division, print_function
 import tensorflow as tf
+import random
 
 def string_length_tf(t):
   return tf.py_func(len, [t], [tf.int64])
@@ -41,8 +42,12 @@ class MonodepthDataloader(object):
         else:
             left_image_path  = tf.string_join([self.data_path, split_line[0]])
             right_image_path = tf.string_join([self.data_path, split_line[1]])
-            left_image_o  = self.read_image(left_image_path)
-            right_image_o = self.read_image(right_image_path)
+            if mode == 'test':
+                offset = 0
+            else:
+                offset = random.random()
+            left_image_o  = self.read_image(left_image_path, offset)
+            right_image_o = self.read_image(right_image_path, offset)
 
         if mode == 'train':
             # randomly flip images
@@ -95,19 +100,24 @@ class MonodepthDataloader(object):
 
         return left_image_aug, right_image_aug
 
-    def read_image(self, image_path):
+    def read_image(self, image_path, offset=0):
         # tf.decode_image does not return the image size, this is an ugly workaround to handle both jpeg and png
-        path_length = string_length_tf(image_path)[0]
-        file_extension = tf.substr(image_path, path_length - 3, 3)
-        file_cond = tf.equal(file_extension, 'jpg')
-        
-        image  = tf.cond(file_cond, lambda: tf.image.decode_jpeg(tf.read_file(image_path)), lambda: tf.image.decode_png(tf.read_file(image_path)))
+        # path_length = string_length_tf(image_path)[0]
+        # file_extension = tf.substr(image_path, path_length - 3, 3)
+        # file_cond = tf.equal(file_extension, 'jpg')
+
+        image = tf.image.decode_jpeg(tf.read_file(image_path))
+
+        # image  = tf.cond(file_cond, lambda: tf.image.decode_jpeg(tf.read_file(image_path)), lambda: tf.image.decode_png(tf.read_file(image_path)))
 
         # if the dataset is cityscapes, we crop the last fifth to remove the car hood
         if self.dataset == 'cityscapes':
             o_height    = tf.shape(image)[0]
             crop_height = (o_height * 4) // 5
             image  =  image[:crop_height,:,:]
+        elif self.dataset == 'stereo360':
+            o_width = tf.shape(image)[1]
+            image = tf.roll(image, tf.to_int32(offset * tf.to_float(o_width)), 1)
 
         image  = tf.image.convert_image_dtype(image,  tf.float32)
         image  = tf.image.resize_images(image,  [self.params.height, self.params.width], tf.image.ResizeMethod.AREA)

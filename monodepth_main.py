@@ -11,7 +11,7 @@ from __future__ import absolute_import, division, print_function
 
 # only keep warnings and errors
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL']='1'
+os.environ['TF_CPP_MIN_LOG_LEVEL']='3'
 
 import numpy as np
 import argparse
@@ -84,7 +84,7 @@ def train(params):
         start_learning_rate = args.learning_rate
 
         boundaries = [np.int32((3/5) * num_total_steps), np.int32((4/5) * num_total_steps)]
-        values = [args.learning_rate, args.learning_rate / 2, args.learning_rate / 4]
+        values = [args.learning_rate, args.learning_rate / 10, args.learning_rate / 100]
         learning_rate = tf.train.piecewise_constant(global_step, boundaries, values)
 
         opt_step = tf.train.AdamOptimizer(learning_rate)
@@ -165,7 +165,7 @@ def train(params):
             if step and step % 100 == 0:
                 examples_per_sec = params.batch_size / duration
                 time_sofar = (time.time() - start_time) / 3600
-                training_time_left = (num_total_steps / step - 1.0) * time_sofar
+                training_time_left = ((num_total_steps - step) / (step - start_step)) * time_sofar
                 print_string = 'batch {:>6} | examples/s: {:4.2f} | loss: {:.5f} | time elapsed: {:.2f}h | time left: {:.2f}h'
                 print(print_string.format(step, examples_per_sec, loss_value, time_sofar, training_time_left))
                 summary_str = sess.run(summary_op)
@@ -208,11 +208,11 @@ def test(params):
 
     print('now testing {} files'.format(num_test_samples))
     disparities    = np.zeros((num_test_samples, params.height, params.width), dtype=np.float32)
-    disparities_pp = np.zeros((num_test_samples, params.height, params.width), dtype=np.float32)
+    # disparities_pp = np.zeros((num_test_samples, params.height, params.width), dtype=np.float32)
     for step in range(num_test_samples):
         disp = sess.run(model.disp_left_est[0])
         disparities[step] = disp[0].squeeze()
-        disparities_pp[step] = post_process_disparity(disp.squeeze())
+        # disparities_pp[step] = post_process_disparity(disp.squeeze())
 
     print('done.')
 
@@ -222,7 +222,7 @@ def test(params):
     else:
         output_directory = args.output_directory
     np.save(output_directory + '/disparities.npy',    disparities)
-    np.save(output_directory + '/disparities_pp.npy', disparities_pp)
+    # np.save(output_directory + '/disparities_pp.npy', disparities_pp)
 
     print('done.')
 

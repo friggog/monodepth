@@ -1,10 +1,10 @@
-# Copyright UCL Business plc 2017. Patent Pending. All rights reserved. 
+# Copyright UCL Business plc 2017. Patent Pending. All rights reserved.
 #
 # The MonoDepth Software is licensed under the terms of the UCLB ACP-A licence
 # which allows for non-commercial use only, the full terms of which are made
 # available in the LICENSE file.
 #
-# For any other use of the software not covered by the UCLB ACP-A Licence, 
+# For any other use of the software not covered by the UCLB ACP-A Licence,
 # please contact info@uclb.com
 
 """Fully convolutional model for monocular depth estimation
@@ -21,7 +21,7 @@ import tensorflow.contrib.slim as slim
 
 from bilinear_sampler import *
 
-monodepth_parameters = namedtuple('parameters', 
+monodepth_parameters = namedtuple('parameters',
                         'encoder, '
                         'height, width, '
                         'batch_size, '
@@ -54,7 +54,7 @@ class MonodepthModel(object):
             return
 
         self.build_losses()
-        self.build_summaries()     
+        self.build_summaries()
 
     def gradient_x(self, img):
         gx = img[:,:,:-1,:] - img[:,:,1:,:]
@@ -113,8 +113,8 @@ class MonodepthModel(object):
         image_gradients_x = [self.gradient_x(img) for img in pyramid]
         image_gradients_y = [self.gradient_y(img) for img in pyramid]
 
-        weights_x = [tf.exp(-tf.reduce_mean(tf.abs(g), 3, keep_dims=True)) for g in image_gradients_x]
-        weights_y = [tf.exp(-tf.reduce_mean(tf.abs(g), 3, keep_dims=True)) for g in image_gradients_y]
+        weights_x = [tf.exp(-tf.reduce_mean(tf.abs(g), 3, keepdims=True)) for g in image_gradients_x]
+        weights_y = [tf.exp(-tf.reduce_mean(tf.abs(g), 3, keepdims=True)) for g in image_gradients_y]
 
         smoothness_x = [disp_gradients_x[i] * weights_x[i] for i in range(4)]
         smoothness_y = [disp_gradients_y[i] * weights_y[i] for i in range(4)]
@@ -124,9 +124,28 @@ class MonodepthModel(object):
         disp = 0.3 * self.conv(x, 2, 3, 1, tf.nn.sigmoid)
         return disp
 
+    def periodic_padding(self, x, padding=1):
+        '''
+        x: shape (batch_size, d1, d2)
+        return x padded with periodic boundaries. i.e. torus or donut
+        '''
+        d0 = x.shape[0] # dimension 0: batch
+        d1 = x.shape[1] # dimension 1: height
+        d2 = x.shape[2] # dimension 2: width
+        d3 = x.shape[3] # dimension 3: channels
+        p = padding
+        middle_left = x[:, :, -p:] # middle left
+        middle_center = x # middle center
+        middle_right = x[:, :, :p] # middle right
+        tb_zeros = tf.zeros((d0, p, d2 + 2 * p, d3))
+        middle = tf.concat([middle_left, middle_center, middle_right], axis=2)
+        padded_x = tf.concat([tb_zeros, middle, tb_zeros], axis=1)
+        return padded_x
+
     def conv(self, x, num_out_layers, kernel_size, stride, activation_fn=tf.nn.elu):
         p = np.floor((kernel_size - 1) / 2).astype(np.int32)
-        p_x = tf.pad(x, [[0, 0], [p, p], [p, p], [0, 0]])
+        # p_x = tf.pad(x, [[0, 0], [p, p], [p, p], [0, 0]])
+        p_x = self.periodic_padding(x, p)
         return slim.conv2d(p_x, num_out_layers, kernel_size, stride, 'VALID', activation_fn=activation_fn)
 
     def conv_block(self, x, num_out_layers, kernel_size):
@@ -192,7 +211,7 @@ class MonodepthModel(object):
             skip4 = conv4
             skip5 = conv5
             skip6 = conv6
-        
+
         with tf.variable_scope('decoder'):
             upconv7 = upconv(conv7,  512, 3, 2) #H/64
             concat7 = tf.concat([upconv7, skip6], 3)
@@ -251,7 +270,7 @@ class MonodepthModel(object):
             skip3 = conv2
             skip4 = conv3
             skip5 = conv4
-        
+
         # DECODING
         with tf.variable_scope('decoder'):
             upconv6 = upconv(conv5,   512, 3, 2) #H/32
@@ -384,7 +403,7 @@ class MonodepthModel(object):
                     tf.summary.image('l1_left_'  + str(i), self.l1_left[i],  max_outputs=4, collections=self.model_collection)
                     tf.summary.image('l1_right_' + str(i), self.l1_right[i], max_outputs=4, collections=self.model_collection)
 
-            if self.params.full_summary:
-                tf.summary.image('left',  self.left,   max_outputs=4, collections=self.model_collection)
-                tf.summary.image('right', self.right,  max_outputs=4, collections=self.model_collection)
+            # if self.params.full_summary:
+            tf.summary.image('left',  self.left,   max_outputs=4, collections=self.model_collection)
+            tf.summary.image('right', self.right,  max_outputs=4, collections=self.model_collection)
 

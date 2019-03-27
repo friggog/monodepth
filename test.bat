@@ -1,0 +1,1 @@
+python monodepth_main.py --mode test --data_path data/ --output_directory out/ --filenames_file utils/filenames/stereo360_test.txt --checkpoint_path log/stereo360/model-80000 --model_name stereo360 --do_stereo --dataset stereo360 --wrap_mode circular --input_width 1024 --input_height 512
